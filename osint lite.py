@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-OSINT-Lite v1.0
+OSINT-Lite v1.1
 Author: sdev
-Tools: PhoneIntel, EmailScan, MetaGrab
+Tools: PhoneIntel, EmailScan, MetaGrab (Optimized)
 Lightweight OSINT tools for Termux/Linux
 """
 
@@ -21,7 +21,7 @@ W = '\033[0m' # Reset
 
 BANNER = f"""
 {B}======================================
-  OSINT-Lite v1.0 | Author: sdev
+  OSINT-Lite v1.1 | Author: sdev
 ======================================{W}
 """
 
@@ -49,7 +49,6 @@ def phone_intel(number):
     print(f" {Y}Provider{W} : {provider}")
     print(f" {Y}Format{W} : Valid" if len(number) >= 11 else f" {Y}Format{W} : {R}Invalid{W}")
 
-    # Try online check if internet available
     try:
         url = f"http://apilayer.net/api/validate?number={number}"
         r = requests.get(url, timeout=5)
@@ -70,7 +69,8 @@ def phone_social_scan(number):
         "Instagram": f"https://instagram.com/{'{user}'}",
         "TikTok": f"https://tiktok.com/@{'{user}'}",
         "GitHub": f"https://github.com/{'{user}'}",
-        "Twitter/X": f"https://x.com/{'{user}'}"
+        "Twitter/X": f"https://x.com/{'{user}'}",
+        "Facebook": f"https://facebook.com/{'{user}'}"
     }
 
     print(f"\n{B}[+] Social Scan from Phone:{W} {number}\n")
@@ -100,7 +100,6 @@ def email_scan(email):
 
     print(f"\n{B}[+] EmailScan:{W} {email}")
 
-    # Check breach via public API
     try:
         url = f"https://api.allorigins.win/raw?url=https://haveibeenpwned.com/unifiedsearch/{email}"
         r = requests.get(url, timeout=8)
@@ -111,12 +110,12 @@ def email_scan(email):
     except Exception as e:
         print(f" {R}[ERROR]{W} Can't check breach: {e}")
 
-    # Check username from email on social sites
     username = email.split('@')[0]
     sites = {
         "GitHub": f"https://github.com/{username}",
         "Twitter/X": f"https://x.com/{username}",
-        "Instagram": f"https://instagram.com/{username}"
+        "Instagram": f"https://instagram.com/{username}",
+        "Facebook": f"https://facebook.com/{username}"
     }
 
     print(f" {Y}Checking username:{W} {username}")
@@ -130,6 +129,16 @@ def email_scan(email):
         except:
             print(f" {R}[ERROR]{W} {site}")
 
+def _convert_to_degrees(value):
+    """Helper function to convert the GPS coordinates to degrees float"""
+    try:
+        d = float(value.values[0].num) / float(value.values[0].den)
+        m = float(value.values[1].num) / float(value.values[1].den)
+        s = float(value.values[2].num) / float(value.values[2].den)
+        return d + (m / 60.0) + (s / 3600.0)
+    except:
+        return None
+
 def meta_grab(filepath):
     path = Path(filepath)
     if not path.exists():
@@ -138,27 +147,46 @@ def meta_grab(filepath):
 
     print(f"\n{B}[+] MetaGrab:{W} {path.name}")
 
-    # File hash
+    # Analisis Nama File (Deteksi Sumber Sosmed)
+    # Foto FB versi lama/baru seringkali memiliki pola angka panjang dipisahkan underscore, atau mengandung kata 'fb'
+    fb_pattern = r'^\d+_\d+_\d+_[n|o]\.(jpg|jpeg)$|^fb_'
+    if re.match(fb_pattern, path.name, re.IGNORECASE):
+        print(f" {Y}Analisis Nama File{W}: {G}Terdeteksi sebagai format unduhan Facebook.{W}")
+        print(f" {Y}Catatan{W}            : Meta secara otomatis menghapus koordinat GPS dan metadata asli dari gambar.")
+
     try:
         hash_md5 = hashlib.md5(path.read_bytes()).hexdigest()
-        print(f" {Y}MD5 Hash{W} : {hash_md5}")
-        print(f" {Y}Size{W} : {path.stat().st_size} bytes")
+        print(f" {Y}MD5 Hash{W}  : {hash_md5}")
+        print(f" {Y}Size{W}      : {path.stat().st_size} bytes")
     except Exception as e:
         print(f" {R}Hash Error:{W} {e}")
 
-    # EXIF data
     try:
         with open(path, 'rb') as f:
             tags = exifread.process_file(f, stop_tag='UNDEF')
 
         if not tags:
-            print(f" {Y}EXIF{W} : {R}No metadata found{W}")
+            print(f" {Y}EXIF{W}       : {R}No metadata found{W}")
         else:
             print(f" {Y}EXIF Data:{W}")
-            for tag in ['Image Make', 'Image Model', 'EXIF DateTimeOriginal',
-                       'GPS GPSLatitude', 'GPS GPSLongitude']:
+            for tag in ['Image Make', 'Image Model', 'EXIF DateTimeOriginal']:
                 if tag in tags:
-                    print(f" {tag:20}: {tags[tag]}")
+                    print(f"  {tag:22}: {tags[tag]}")
+            
+            # Ekstraksi dan pembuatan link Google Maps jika ada koordinat GPS
+            if 'GPS GPSLatitude' in tags and 'GPS GPSLongitude' in tags:
+                lat = _convert_to_degrees(tags['GPS GPSLatitude'])
+                lon = _convert_to_degrees(tags['GPS GPSLongitude'])
+                
+                if lat and lon:
+                    lat_ref = tags.get('GPS GPSLatitudeRef', 'N').values
+                    lon_ref = tags.get('GPS GPSLongitudeRef', 'E').values
+                    
+                    if lat_ref == 'S': lat = -lat
+                    if lon_ref == 'W': lon = -lon
+                    
+                    print(f"  {G}GPS Koordinat{W}        : {lat}, {lon}")
+                    print(f"  {G}Google Maps Link{W}     : https://www.google.com/maps?q={lat},{lon}")
     except Exception as e:
         print(f" {R}EXIF Error:{W} {e}")
 
