@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-OSINT-Lite v2.0
+OSINT-Lite v2.1
 Author: sdev
-Tools: PhoneIntel, EmailScan, MetaGrab (Enhanced & Optimized)
+Tools: PhoneIntel, EmailScan, MetaGrab (Embedded API Key & Enhanced)
 Lightweight OSINT tools for Termux/Linux
 """
 
-import argparse, requests, re, sys
+import argparse, requests, re
 from pathlib import Path
 import exifread
 import hashlib
+
+# Direct API Key configuration (secured locally)
+APILAYER_KEY = "64b1e4a799590016d5fa785573b9a44f"
 
 # Colors for output
 G = '\033[92m' # Green
@@ -26,7 +29,7 @@ HEADERS = {
 
 BANNER = f"""
 {B}======================================
-  OSINT-Lite v2.0 | Author: sdev
+  OSINT-Lite v2.1 | Author: sdev
 ======================================{W}
 """
 
@@ -55,15 +58,18 @@ def phone_intel(number):
     print(f" {Y}Format{W} : Valid" if len(number) >= 11 else f" {Y}Format{W} : {R}Invalid{W}")
 
     try:
-        url = f"http://apilayer.net/api/validate?number={number}"
+        url = f"http://apilayer.net/api/validate?access_key={APILAYER_KEY}&number={number}"
         r = requests.get(url, headers=HEADERS, timeout=5)
         if r.status_code == 200:
             data = r.json()
             if data.get('valid'):
                 print(f" {Y}Line Type{W}: {data.get('line_type', 'N/A')}")
                 print(f" {Y}Location{W} : {data.get('location', 'N/A')}")
+                print(f" {Y}Carrier{W}  : {data.get('carrier', 'N/A')}")
+            else:
+                print(f" {Y}API Status{W}: Nomor tidak valid menurut database.")
     except requests.exceptions.RequestException:
-        print(f" {Y}Status{W} : {R}Offline check only (API Timeout/Error){W}")
+        print(f" {Y}Status{W} : {R}Gagal terhubung ke API (Timeout/Error){W}")
 
 def phone_social_scan(number):
     number = re.sub(r'[^0-9]', '', number)
@@ -154,7 +160,6 @@ def meta_grab(filepath):
 
     print(f"\n{B}[+] MetaGrab (Enhanced Photo Forensic):{W} {path.name}")
 
-    # Analisis Pola Nama File Media Sosial
     fb_pattern = r'^\d+_\d+_\d+_[n|o]\.(jpg|jpeg)$|^fb_'
     ig_pattern = r'^\d+_\d+_\d+_n\.(jpg|jpeg)$'
     wa_pattern = r'^IMG-\d{8}-WA\d+'
@@ -236,10 +241,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python osint-lite.py --phone 08123456789
-  python osint-lite.py --phone-social 08123456789
-  python osint-lite.py --email test@gmail.com
-  python osint-lite.py --meta photo.jpg
+  python3 "osint lite.py" --phone 08123456789
+  python3 "osint lite.py" --email test@gmail.com
+  python3 "osint lite.py" --meta photo.jpg
         """
     )
 
