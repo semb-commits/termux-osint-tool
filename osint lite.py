@@ -3,17 +3,19 @@
 """
 OSINT-Lite v2.1
 Author: sdev
-Tools: PhoneIntel, EmailScan, MetaGrab (Embedded API Key & Enhanced)
+Tools: PhoneIntel, EmailScan, MetaGrab (Secure Environment Config)
 Lightweight OSINT tools for Termux/Linux
 """
 
-import argparse, requests, re
+import argparse, requests, re, os
 from pathlib import Path
 import exifread
 import hashlib
+from dotenv import load_dotenv
 
-# Direct API Key configuration (secured locally)
-APILAYER_KEY = "64b1e4a799590016d5fa785573b9a44f"
+# Load environment variables from local .env file
+load_dotenv()
+APILAYER_KEY = os.getenv("APILAYER_KEY", "")
 
 # Colors for output
 G = '\033[92m' # Green
@@ -56,6 +58,10 @@ def phone_intel(number):
 
     print(f" {Y}Provider{W} : {provider}")
     print(f" {Y}Format{W} : Valid" if len(number) >= 11 else f" {Y}Format{W} : {R}Invalid{W}")
+
+    if not APILAYER_KEY:
+        print(f" {Y}Status{W} : {R}API Key tidak ditemukan di file .env (Offline check only){W}")
+        return
 
     try:
         url = f"http://apilayer.net/api/validate?access_key={APILAYER_KEY}&number={number}"
